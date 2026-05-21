@@ -39,7 +39,7 @@ RESOLUTION_OPTIONS = [
 ]
 LANGUAGE_OPTIONS = ["English", "Česky"]
 FPS_OPTIONS = [30, 60, 120]
-
+ 
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Elite Dangerous")
  
@@ -172,7 +172,7 @@ def show_menu(selected_resolution):
     while True:
         screen.fill(BLACK)
         menu_buttons = []
-
+ 
         lang = language_options[selected_language]
         if menu_mode == "main":
             title = "Elite Dangerous" if selected_language == 0 else "Elite Dangerous"
@@ -231,7 +231,7 @@ def show_menu(selected_resolution):
             menu_buttons.append(("back", None, back_rect))
             pygame.draw.rect(screen, RED, back_rect)
             screen.blit(font.render("Back" if selected_language == 0 else "Zpět", True, BLACK), (back_rect.x + 65, back_rect.y + 12))
-
+ 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
@@ -335,7 +335,7 @@ def show_menu(selected_resolution):
                             menu_mode = "settings" if menu_mode == "resolution" else "main"
                             menu_index = 0
                         break
-
+ 
         pygame.display.flip()
         clock.tick(FPS)
  
@@ -538,3 +538,4 @@ while True:
     run_game()
  
 pygame.quit()
+ 
