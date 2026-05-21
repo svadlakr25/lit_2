@@ -1,358 +1,540 @@
 import pygame
-import sys
 import math
 import random
-import os
-
-pygame.init()
-
-SCREEN_WIDTH = 1500
-SCREEN_HEIGHT = 800
-
-COLOR_BG = (0, 0, 0)
-COLOR_PANEL = (18, 25, 40)
-COLOR_ACCENT = (120, 200, 255)
-COLOR_TEXT = (220, 230, 240)
-COLOR_HIGHLIGHT = (120, 200, 255)
-COLOR_SHIP = (200, 230, 255)
-COLOR_STATION = (180, 170, 120)
-
-SHIP_ACCEL = 220
-SHIP_ROT_SPEED = 3.2
-SHIP_FRICTION = 0.995
-SHIP_MAX_SPEED = 420
-STATION_PERMIT_RADIUS = 150
-STATION_LANDING_RADIUS = 70
-DOCK_SPEED_MAX = 80
-INITIAL_CREDITS = 500
-MIN_STATION_DISTANCE = 700
-CARGO_CAPACITY = 25
-FUEL_CAPACITY = 100
-FUEL_CONSUMPTION = 2
-MAP_WIDTH = 320
-MAP_HEIGHT = 170
-MAP_RANGE = 5200
-TRADE_ITEMS = {
-    "Fuel": {"buy": 5, "sell": 3},
-    "Cargo": {"buy": 20, "sell": 14},
-    "Ammo": {"buy": 12, "sell": 8},
+import sys
+ 
+# --- KONFIGURACE ---
+WIDTH, HEIGHT = 1100, 700
+FPS = 60
+STATION_PERMIT_RADIUS = 220
+STATION_LANDING_RADIUS = 90
+ 
+# Barvy
+BLACK = (0, 0, 0)
+WHITE = (255, 255, 255)
+GREEN = (0, 255, 150)
+RED = (255, 50, 50)
+YELLOW = (255, 215, 0)
+BLUE = (50, 150, 255)
+ 
+# Obchodovatelné komodity a jejich základní ceny
+GOODS = ["Meat", "Table", "Food", "Ore", "Spices"]
+BASE_PRICES = {
+    "Meat": 40,
+    "Table": 70,
+    "Food": 35,
+    "Ore": 55,
+    "Spices": 75
 }
+ 
+pygame.init()
+clock = pygame.time.Clock()
+font = pygame.font.SysFont("Consolas", 18)
+ 
+RESOLUTION_OPTIONS = [
+    ((800, 600), "800 x 600"),
+    ((1000, 600), "1000 x 600"),
+    ((1920, 1080), "1920 x 1080"),
+    (None, "Fullscreen")
+]
+LANGUAGE_OPTIONS = ["English", "Česky"]
+FPS_OPTIONS = [30, 60, 120]
 
-
-def clamp(value, min_value, max_value):
-    return max(min_value, min(max_value, value))
-
-
-def generate_stations(count):
-    stations = []
-    attempts = 0
-    while len(stations) < count and attempts < count * 20:
-        x = random.randint(-2500, 2500)
-        y = random.randint(-1800, 1800)
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Elite Dangerous")
+ 
+# --- TŘÍDA PRO HRÁČE ---
+class Player:
+    def __init__(self):
+        self.x, self.y = 0, 0  # Globální pozice ve vesmíru
+        self.angle = 90
+        self.vel_x, self.vel_y = 0, 0
+        self.thrust = 0.2
+        self.friction = 0.98
+        self.fuel = 100.0
+        self.credits = 500
+        self.cargo = {item: 0 for item in GOODS}
+        self.max_cargo = 20
+ 
+    def update(self):
+        keys = pygame.key.get_pressed()
+       
+        # Rotace (A a D)
+        if keys[pygame.K_a]: self.angle += 4
+        if keys[pygame.K_d]: self.angle -= 4
+       
+        # Pohyb vpřed (W)
+        if keys[pygame.K_w] and self.fuel > 0:
+            rad = math.radians(self.angle)
+            self.vel_x += math.cos(rad) * self.thrust
+            self.vel_y -= math.sin(rad) * self.thrust
+            self.fuel -= 0.03  # pomalejší spotřeba paliva
+       
+        # Brzda (S)
+        if keys[pygame.K_s]:
+            self.vel_x *= 0.92
+            self.vel_y *= 0.92
+ 
+        # Aplikace pohybu a tření
+        self.x += self.vel_x
+        self.y += self.vel_y
+        self.vel_x *= self.friction
+        self.vel_y *= self.friction
+ 
+    def cargo_total(self):
+        return sum(self.cargo.values())
+ 
+# --- GENEROVÁNÍ VESMÍRU ---
+player = Player()
+ 
+# Náhodné stanice v obrovském prostoru
+stations = []
+names = ["Alpha", "Bravo", "Gamma", "Delta", "Echo", "Omega", "Nova", "Sierra", "Vega", "Orion", "Atlas", "Titan"]
+station_range = 9000
+min_station_distance = 1400
+attempts = 0
+for name in names:
+    placed = False
+    while not placed and attempts < len(names) * 30:
+        x = random.randint(-station_range, station_range)
+        y = random.randint(-station_range, station_range)
         too_close = False
         for station in stations:
-            if math.hypot(station["x"] - x, station["y"] - y) < MIN_STATION_DISTANCE:
+            if math.hypot(station["x"] - x, station["y"] - y) < min_station_distance:
                 too_close = True
                 break
         if not too_close:
-            market = {}
-            for item, price in TRADE_ITEMS.items():
-                modifier = random.uniform(-0.25, 0.25)
-                market[item] = {
-                    "buy": max(1, int(price["buy"] * (1 + modifier))),
-                    "sell": max(1, int(price["sell"] * (1 + modifier * 0.8)))
-                }
+            prices = {}
+            for good in GOODS:
+                base = BASE_PRICES[good]
+                buy_price = max(5, base + random.randint(-15, 20))
+                sell_price = max(1, buy_price - random.randint(10, 25))
+                prices[good] = {"buy": buy_price, "sell": sell_price}
             stations.append({
+                "name": f"Station {name}",
                 "x": x,
                 "y": y,
-                "name": f"Station {len(stations) + 1}",
-                "market": market,
+                "prices": prices,
+                "fuel_price": 8,
+                "permit_radius": STATION_PERMIT_RADIUS,
+                "landing_radius": STATION_LANDING_RADIUS
             })
+            placed = True
         attempts += 1
-    return stations
-
-
-def generate_stars(count):
-    stars = []
-    for _ in range(count):
-        x = random.randint(-4000, 4000)
-        y = random.randint(-3200, 3200)
-        size = random.choice([1, 1, 2])
-        stars.append((x, y, size))
-    return stars
-
-
-def draw_ship(screen, ship_center, angle):
-    base_points = [
-        (0, -20),
-        (-12, 14),
-        (0, 8),
-        (12, 14),
-    ]
-    cos_a = math.cos(angle)
-    sin_a = math.sin(angle)
-    rotated = [
-        (ship_center[0] + x * cos_a - y * sin_a, ship_center[1] + x * sin_a + y * cos_a)
-        for x, y in base_points
-    ]
-    pygame.draw.polygon(screen, COLOR_SHIP, rotated)
-    pygame.draw.circle(screen, COLOR_ACCENT, ship_center, 5, 1)
-
-
-def draw_space(screen, ship_pos, stars, stations, ship_angle, closest_station=None):
-    screen.fill(COLOR_BG)
-
-    # Stars in background
-    for x, y, size in stars:
-        dx = x - ship_pos[0] + SCREEN_WIDTH // 2
-        dy = y - ship_pos[1] + SCREEN_HEIGHT // 2
-        if -20 < dx < SCREEN_WIDTH + 20 and -20 < dy < SCREEN_HEIGHT + 20:
-            color = (255, 255, 255) if random.random() < 0.25 else (180, 200, 255)
-            pygame.draw.circle(screen, color, (int(dx), int(dy)), size)
-
-    # Station markers only
-    for station in stations:
-        dx = station["x"] - ship_pos[0] + SCREEN_WIDTH // 2
-        dy = station["y"] - ship_pos[1] + SCREEN_HEIGHT // 2
-        if -80 < dx < SCREEN_WIDTH + 80 and -80 < dy < SCREEN_HEIGHT + 80:
-            pygame.draw.rect(screen, COLOR_STATION, (dx - 12, dy - 12, 24, 24), border_radius=4)
-            pygame.draw.circle(screen, COLOR_ACCENT, (int(dx), int(dy)), 6, 1)
-            if closest_station is station:
-                label_font = pygame.font.SysFont(None, 22)
-                label = label_font.render(station["name"], True, COLOR_ACCENT)
-                screen.blit(label, (dx + 16, dy - 10))
-
-    ship_center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
-    draw_ship(screen, ship_center, ship_angle)
-
-
-def draw_ui(screen, speed, closest_name, closest_dist, near_station, can_dock, credits, inventory):
-    font = pygame.font.SysFont(None, 28)
-    cargo_label = f"{inventory['CargoAmount']}/{CARGO_CAPACITY}"
-    if inventory['CargoType']:
-        cargo_label = f"{inventory['CargoType']} {inventory['CargoAmount']}/{CARGO_CAPACITY}"
-
-    status = (
-        f"WASD pohyb · Speed: {int(speed)} m/s · Credits: {credits} "
-        f"· Cargo: {cargo_label}"
-    )
-    text = font.render(status, True, COLOR_TEXT)
-    surface = pygame.Surface((text.get_width() + 16, text.get_height() + 10), pygame.SRCALPHA)
-    surface.fill((5, 10, 30, 200))
-    surface.blit(text, (8, 5))
-    screen.blit(surface, (20, 20))
-
-    fuel_text = font.render(f"Fuel: {int(inventory['Fuel'])}/{FUEL_CAPACITY}", True, COLOR_TEXT)
-    fuel_surface = pygame.Surface((fuel_text.get_width() + 16, fuel_text.get_height() + 10), pygame.SRCALPHA)
-    fuel_surface.fill((5, 10, 30, 200))
-    fuel_surface.blit(fuel_text, (8, 5))
-    screen.blit(fuel_surface, (20, SCREEN_HEIGHT - fuel_text.get_height() - 34))
-
-    action_text = ""
-    if near_station:
-        action_text = "In docking zone. Press E to dock." if can_dock else "Slow down to dock (Speed below 80 m/s)."
+    if not placed:
+        prices = {}
+        for good in GOODS:
+            base = BASE_PRICES[good]
+            buy_price = max(5, base + random.randint(-15, 20))
+            sell_price = max(1, buy_price - random.randint(10, 25))
+            prices[good] = {"buy": buy_price, "sell": sell_price}
+        stations.append({
+            "name": f"Station {name}",
+            "x": random.randint(-station_range, station_range),
+            "y": random.randint(-station_range, station_range),
+            "prices": prices,
+            "fuel_price": 8,
+            "permit_radius": STATION_PERMIT_RADIUS,
+            "landing_radius": STATION_LANDING_RADIUS
+        })
+ 
+# Statické hvězdy na pozadí (pro pocit pohybu)
+ 
+def create_screen(resolution):
+    global WIDTH, HEIGHT, screen
+    if resolution is None:
+        screen = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+        WIDTH, HEIGHT = screen.get_size()
     else:
-        action_text = f"Nearest: {closest_name} ({int(closest_dist)} m)"
-    info = font.render(action_text, True, COLOR_ACCENT if near_station else COLOR_TEXT)
-    info_surface = pygame.Surface((info.get_width() + 16, info.get_height() + 10), pygame.SRCALPHA)
-    info_surface.fill((5, 10, 30, 180))
-    info_surface.blit(info, (8, 5))
-    screen.blit(info_surface, (20, 56))
+        WIDTH, HEIGHT = resolution
+        screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    pygame.display.set_caption("Elite Dangerous")
+    return screen
+ 
+ 
+def draw_centered(text, y, color=WHITE):
+    img = font.render(text, True, color)
+    screen.blit(img, ((WIDTH - img.get_width()) // 2, y))
+ 
+selected_resolution = 1
+selected_language = 1
+selected_fps = 60
+ 
+resolution_options = RESOLUTION_OPTIONS
+language_options = LANGUAGE_OPTIONS
+fps_options = FPS_OPTIONS
+ 
+ 
+def show_menu(selected_resolution):
+    global selected_language, selected_fps, FPS
+    menu_mode = "main"
+    menu_index = 0
+    while True:
+        screen.fill(BLACK)
+        menu_buttons = []
 
-
-def draw_trade_menu(screen, station, credits, inventory):
-    menu_w = 420
-    menu_h = 320
-    menu_x = SCREEN_WIDTH - menu_w - 40
-    menu_y = 120
-    pygame.draw.rect(screen, (8, 12, 28), (menu_x, menu_y, menu_w, menu_h), border_radius=14)
-    pygame.draw.rect(screen, COLOR_ACCENT, (menu_x, menu_y, menu_w, menu_h), 2, border_radius=14)
-
-    menu_font = pygame.font.SysFont(None, 32)
-    title = menu_font.render(f"{station['name']} Market", True, COLOR_TEXT)
-    screen.blit(title, (menu_x + 18, menu_y + 18))
-
-    small_font = pygame.font.SysFont(None, 24)
-    cargo_label = f"{inventory['CargoAmount']}/{CARGO_CAPACITY}"
-    if inventory['CargoType']:
-        cargo_label = f"{inventory['CargoType']} {inventory['CargoAmount']}/{CARGO_CAPACITY}"
-    sell_label = "4: Cargo → empty"
-    if inventory['CargoType']:
-        sell_price = station['market'][inventory['CargoType']]['sell']
-        sell_label = f"4: Cargo → {sell_price} cr"
-    lines = [
-        f"Credits: {credits}",
-        f"Cargo: {cargo_label}",
-        f"Fuel: {int(inventory['Fuel'])}/{FUEL_CAPACITY}",
-        "",
-        "Buy:",
-        f"1: Fuel → {station['market']['Fuel']['buy']} cr",
-        f"2: Cargo → {station['market']['Cargo']['buy']} cr",
-        f"3: Ammo → {station['market']['Ammo']['buy']} cr",
-        "",
-        "Sell:",
-        sell_label,
-        "",
-        "Q: Leave station",
-    ]
-    for i, line in enumerate(lines):
-        screen.blit(small_font.render(line, True, COLOR_TEXT), (menu_x + 20, menu_y + 70 + i * 28))
-
-
-def draw_map(screen, ship_pos, stations, ship_angle):
-    map_x = SCREEN_WIDTH - MAP_WIDTH - 10
-    map_y = 10
-    pygame.draw.rect(screen, (12, 18, 28), (map_x, map_y, MAP_WIDTH, MAP_HEIGHT), border_radius=8)
-    pygame.draw.rect(screen, COLOR_ACCENT, (map_x, map_y, MAP_WIDTH, MAP_HEIGHT), 1, border_radius=8)
-
-    inner_x = map_x + 8
-    inner_y = map_y + 8
-    inner_w = MAP_WIDTH - 16
-    inner_h = MAP_HEIGHT - 16
-    pygame.draw.rect(screen, (8, 12, 20), (inner_x, inner_y, inner_w, inner_h), border_radius=6)
-
-    scale = MAP_RANGE / 2
-    for station in stations:
-        rel_x = (station["x"] - ship_pos[0]) / scale
-        rel_y = (station["y"] - ship_pos[1]) / scale
-        map_px = inner_x + inner_w / 2 + rel_x * inner_w / 2
-        map_py = inner_y + inner_h / 2 + rel_y * inner_h / 2
-        if -0.2 <= rel_x <= 0.2 and -0.2 <= rel_y <= 0.2:
-            pygame.draw.circle(screen, COLOR_STATION, (int(map_px), int(map_py)), 4)
-        elif abs(rel_x) <= 1.5 and abs(rel_y) <= 1.5:
-            clamped_x = clamp(map_px, inner_x + 4, inner_x + inner_w - 4)
-            clamped_y = clamp(map_py, inner_y + 4, inner_y + inner_h - 4)
-            pygame.draw.circle(screen, COLOR_ACCENT, (int(clamped_x), int(clamped_y)), 2)
-
-    ship_x = inner_x + inner_w / 2
-    ship_y = inner_y + inner_h / 2
-    ship_points = [
-        (0, -6),
-        (-4, 5),
-        (4, 5),
-    ]
-    cos_a = math.cos(ship_angle)
-    sin_a = math.sin(ship_angle)
-    rotated = [
-        (ship_x + x * cos_a - y * sin_a, ship_y + x * sin_a + y * cos_a)
-        for x, y in ship_points
-    ]
-    pygame.draw.polygon(screen, COLOR_SHIP, rotated)
-    pygame.draw.circle(screen, COLOR_SHIP, (int(ship_x), int(ship_y)), 2)
-
-
-def find_closest_station(ship_pos, stations):
-    best = None
-    best_dist = float('inf')
-    for station in stations:
-        dist = math.hypot(station["x"] - ship_pos[0], station["y"] - ship_pos[1])
-        if dist < best_dist:
-            best_dist = dist
-            best = station
-    return best, best_dist
-
-
-def main():
-    screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-    pygame.display.set_caption("Elite Dangerous Top-Down Ship")
-    clock = pygame.time.Clock()
-    running = True
-
-    ship_pos = [0.0, 0.0]
-    ship_vel = [0.0, 0.0]
-    ship_angle = 0.0
-    credits = INITIAL_CREDITS
-    inventory = {"Fuel": FUEL_CAPACITY, "CargoType": None, "CargoAmount": 0}
-    trade_mode = False
-    stations = generate_stations(7)
-    stars = generate_stars(180)
-
-    while running:
-        dt = clock.tick(60) / 1000.0
-
-        closest_station, closest_dist = find_closest_station(ship_pos, stations)
-        near_station = closest_dist < STATION_PERMIT_RADIUS
-        speed = math.hypot(ship_vel[0], ship_vel[1])
-        can_dock = near_station and speed < DOCK_SPEED_MAX
+        lang = language_options[selected_language]
+        if menu_mode == "main":
+            title = "Elite Dangerous" if selected_language == 0 else "Elite Dangerous"
+            subtitle = "Start and choose settings before play" if selected_language == 0 else "Start a zvol nastavení před hrou"
+            draw_centered(title, 120, YELLOW)
+            draw_centered(subtitle, 160, WHITE)
+            for idx, label in enumerate(["Start Game" if selected_language == 0 else "Spustit hru",
+                                         "Settings" if selected_language == 0 else "Nastavení",
+                                         "Quit" if selected_language == 0 else "Konec"]):
+                rect = pygame.Rect((WIDTH // 2 - 150, 240 + idx * 70, 300, 50))
+                menu_buttons.append(("main", idx, rect))
+                color = GREEN if idx == menu_index else BLUE
+                pygame.draw.rect(screen, color, rect)
+                screen.blit(font.render(label, True, BLACK), (rect.x + 80, rect.y + 14))
+        elif menu_mode == "settings":
+            draw_centered("Settings" if selected_language == 0 else "Nastavení", 120, YELLOW)
+            draw_centered("Choose language, FPS, resolution", 160, WHITE) if selected_language == 0 else draw_centered("Vyber jazyk, FPS, rozlišení", 160, WHITE)
+            settings_items = [
+                ("language", f"Language: {language_options[selected_language]}") if selected_language == 0 else ("language", f"Jazyk: {language_options[selected_language]}"),
+                ("fps", f"FPS: {selected_fps}"),
+                ("resolution", f"Resolution: {resolution_options[selected_resolution][1]}" if selected_language == 0 else f"Rozlišení: {resolution_options[selected_resolution][1]}"),
+                ("back", "Back" if selected_language == 0 else "Zpět")
+            ]
+            for idx, (_, label) in enumerate(settings_items):
+                rect = pygame.Rect((WIDTH // 2 - 220, 240 + idx * 60, 440, 45))
+                menu_buttons.append((settings_items[idx][0], idx, rect))
+                color = GREEN if idx == menu_index else BLUE
+                pygame.draw.rect(screen, color, rect)
+                screen.blit(font.render(label, True, BLACK), (rect.x + 20, rect.y + 12))
+        elif menu_mode == "language":
+            draw_centered("Choose Language" if selected_language == 0 else "Vyber jazyk", 120, YELLOW)
+            for idx, label in enumerate(language_options):
+                rect = pygame.Rect((WIDTH // 2 - 150, 240 + idx * 70, 300, 50))
+                menu_buttons.append(("language", idx, rect))
+                color = GREEN if idx == menu_index else BLUE
+                pygame.draw.rect(screen, color, rect)
+                screen.blit(font.render(label, True, BLACK), (rect.x + 80, rect.y + 14))
+        elif menu_mode == "fps":
+            draw_centered("Choose FPS" if selected_language == 0 else "Vyber FPS", 120, YELLOW)
+            for idx, value in enumerate(fps_options):
+                label = f"{value} FPS"
+                rect = pygame.Rect((WIDTH // 2 - 150, 240 + idx * 70, 300, 50))
+                menu_buttons.append(("fps", idx, rect))
+                color = GREEN if idx == menu_index else BLUE
+                pygame.draw.rect(screen, color, rect)
+                screen.blit(font.render(label, True, BLACK), (rect.x + 80, rect.y + 14))
+        elif menu_mode == "resolution":
+            draw_centered("Choose Resolution" if selected_language == 0 else "Vyber rozlišení", 120, YELLOW)
+            for idx, (_, label) in enumerate(resolution_options):
+                rect = pygame.Rect((WIDTH // 2 - 220, 240 + idx * 60, 440, 45))
+                menu_buttons.append(("resolution", idx, rect))
+                color = GREEN if idx == selected_resolution else BLUE
+                pygame.draw.rect(screen, color, rect)
+                screen.blit(font.render(label, True, BLACK), (rect.x + 20, rect.y + 12))
+            back_rect = pygame.Rect((WIDTH // 2 - 90, 240 + len(resolution_options) * 60, 180, 45))
+            menu_buttons.append(("back", None, back_rect))
+            pygame.draw.rect(screen, RED, back_rect)
+            screen.blit(font.render("Back" if selected_language == 0 else "Zpět", True, BLACK), (back_rect.x + 65, back_rect.y + 12))
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                running = False
-            elif event.type == pygame.KEYDOWN:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    running = False
-                elif trade_mode:
-                    market = closest_station["market"]
-                    if event.key == pygame.K_1 and credits >= market["Fuel"]["buy"] and inventory["Fuel"] < FUEL_CAPACITY:
-                        credits -= market["Fuel"]["buy"]
-                        inventory["Fuel"] = min(FUEL_CAPACITY, inventory["Fuel"] + 1)
-                    elif event.key == pygame.K_2 and credits >= market["Cargo"]["buy"] and inventory["CargoAmount"] < CARGO_CAPACITY and (inventory["CargoType"] is None or inventory["CargoType"] == "Cargo"):
-                        credits -= market["Cargo"]["buy"]
-                        inventory["CargoType"] = "Cargo"
-                        inventory["CargoAmount"] += 1
-                    elif event.key == pygame.K_3 and credits >= market["Ammo"]["buy"] and inventory["CargoAmount"] < CARGO_CAPACITY and (inventory["CargoType"] is None or inventory["CargoType"] == "Ammo"):
-                        credits -= market["Ammo"]["buy"]
-                        inventory["CargoType"] = "Ammo"
-                        inventory["CargoAmount"] += 1
-                    elif event.key == pygame.K_4 and inventory["CargoAmount"] > 0:
-                        sell_price = market[inventory["CargoType"]]["sell"]
-                        credits += sell_price * inventory["CargoAmount"]
-                        inventory["CargoType"] = None
-                        inventory["CargoAmount"] = 0
-                    elif event.key == pygame.K_q:
-                        trade_mode = False
-                else:
-                    if event.key == pygame.K_e and can_dock:
-                        trade_mode = True
-
-        if trade_mode:
-            ship_vel[0] = 0.0
-            ship_vel[1] = 0.0
-        else:
-            keys = pygame.key.get_pressed()
-            if keys[pygame.K_a]:
-                ship_angle -= SHIP_ROT_SPEED * dt
-            if keys[pygame.K_d]:
-                ship_angle += SHIP_ROT_SPEED * dt
-
-            thrust = 0.0
-            if keys[pygame.K_w] and inventory["Fuel"] > 0:
-                thrust += SHIP_ACCEL
-                inventory["Fuel"] = max(0, inventory["Fuel"] - FUEL_CONSUMPTION * dt)
-            if keys[pygame.K_s]:
-                thrust -= SHIP_ACCEL * 0.55
-
-            thrust_x = math.sin(ship_angle) * thrust
-            thrust_y = -math.cos(ship_angle) * thrust
-
-            ship_vel[0] += thrust_x * dt
-            ship_vel[1] += thrust_y * dt
-            ship_vel[0] *= SHIP_FRICTION
-            ship_vel[1] *= SHIP_FRICTION
-
-        speed = math.hypot(ship_vel[0], ship_vel[1])
-        if near_station and speed > DOCK_SPEED_MAX:
-            scale = DOCK_SPEED_MAX / speed
-            ship_vel[0] *= scale
-            ship_vel[1] *= scale
-            speed = DOCK_SPEED_MAX
-
-        ship_pos[0] += ship_vel[0] * dt
-        ship_pos[1] += ship_vel[1] * dt
-
-        draw_space(screen, ship_pos, stars, stations, ship_angle, closest_station)
-        draw_ui(screen, speed, closest_station["name"], closest_dist, near_station, can_dock, credits, inventory)
-        draw_map(screen, ship_pos, stations, ship_angle)
-        if trade_mode:
-            draw_trade_menu(screen, closest_station, credits, inventory)
+                    if menu_mode in ("settings", "language", "fps", "resolution"):
+                        menu_mode = "main" if menu_mode == "settings" else "settings"
+                        menu_index = 0
+                    else:
+                        pygame.quit()
+                        sys.exit()
+                elif event.key == pygame.K_DOWN:
+                    if menu_mode == "settings":
+                        menu_index = min(menu_index + 1, 3)
+                    elif menu_mode == "main":
+                        menu_index = min(menu_index + 1, 2)
+                    elif menu_mode == "language":
+                        menu_index = min(menu_index + 1, len(language_options) - 1)
+                    elif menu_mode == "fps":
+                        menu_index = min(menu_index + 1, len(fps_options) - 1)
+                    elif menu_mode == "resolution":
+                        menu_index = min(menu_index + 1, len(resolution_options) - 1)
+                elif event.key == pygame.K_UP:
+                    menu_index = max(menu_index - 1, 0)
+                elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                    if menu_mode == "main":
+                        if menu_index == 0:
+                            return selected_resolution
+                        elif menu_index == 1:
+                            menu_mode = "settings"
+                            menu_index = 0
+                        else:
+                            pygame.quit()
+                            sys.exit()
+                    elif menu_mode == "settings":
+                        if menu_index == 0:
+                            menu_mode = "language"
+                            menu_index = selected_language
+                        elif menu_index == 1:
+                            menu_mode = "fps"
+                            menu_index = fps_options.index(selected_fps)
+                        elif menu_index == 2:
+                            menu_mode = "resolution"
+                            menu_index = selected_resolution
+                        else:
+                            menu_mode = "main"
+                            menu_index = 1
+                    elif menu_mode == "language":
+                        selected_language = menu_index
+                        menu_mode = "settings"
+                        menu_index = 0
+                    elif menu_mode == "fps":
+                        selected_fps = fps_options[menu_index]
+                        FPS = selected_fps
+                        menu_mode = "settings"
+                        menu_index = 1
+                    elif menu_mode == "resolution":
+                        selected_resolution = menu_index
+                        menu_mode = "settings"
+                        menu_index = 2
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                mx, my = event.pos
+                for kind, idx, rect in menu_buttons:
+                    if rect.collidepoint(mx, my):
+                        if kind == "main":
+                            if idx == 0:
+                                return selected_resolution
+                            elif idx == 1:
+                                menu_mode = "settings"
+                                menu_index = 0
+                            else:
+                                pygame.quit()
+                                sys.exit()
+                        elif kind == "language":
+                            if menu_mode == "settings":
+                                menu_mode = "language"
+                                menu_index = selected_language
+                            else:
+                                selected_language = idx
+                                menu_mode = "settings"
+                                menu_index = 0
+                        elif kind == "fps":
+                            if menu_mode == "settings":
+                                menu_mode = "fps"
+                                menu_index = fps_options.index(selected_fps)
+                            else:
+                                selected_fps = fps_options[idx]
+                                FPS = selected_fps
+                                menu_mode = "settings"
+                                menu_index = 1
+                        elif kind == "resolution":
+                            if menu_mode == "settings":
+                                menu_mode = "resolution"
+                                menu_index = selected_resolution
+                            else:
+                                selected_resolution = idx
+                                menu_mode = "settings"
+                                menu_index = 2
+                        elif kind == "back":
+                            menu_mode = "settings" if menu_mode == "resolution" else "main"
+                            menu_index = 0
+                        break
 
         pygame.display.flip()
-
-    pygame.quit()
-    sys.exit()
-
-
-if __name__ == "__main__":
-    main()
-
-
+        clock.tick(FPS)
+ 
+ 
+def run_game():
+    global selected_good, trade_message
+    selected_good = 0
+    trade_message = ""
+    while True:
+        screen.fill(BLACK)
+ 
+        market_station = None
+        market_buttons = []
+        market_line_rects = []
+        fuel_button = None
+        panel_x = WIDTH // 2 - 300
+        panel_y = HEIGHT // 2 - 145
+ 
+        in_permit_zone = False
+        in_landing_zone = False
+        nearest_station = None
+        nearest_dist = float("inf")
+        for s in stations:
+            dist = math.hypot(player.x - s["x"], player.y - s["y"])
+            if dist < nearest_dist:
+                nearest_dist = dist
+                nearest_station = s
+            if dist < s["permit_radius"]:
+                in_permit_zone = True
+            if dist < s["landing_radius"]:
+                in_landing_zone = True
+                market_station = s
+                break
+        if market_station:
+            for idx, good in enumerate(GOODS):
+                y = panel_y + 60 + idx * 40
+                market_line_rects.append(pygame.Rect(panel_x + 20, y, 520, 32))
+                market_buttons.append(("buy", idx, good, pygame.Rect(panel_x + 380, y + 4, 90, 24)))
+                market_buttons.append(("sell", idx, good, pygame.Rect(panel_x + 490, y + 4, 90, 24)))
+            fuel_button = pygame.Rect(panel_x + 380, panel_y + 60 + len(GOODS) * 40, 200, 30)
+ 
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                return
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and market_station:
+                trade_message = ""
+                mx, my = event.pos
+                for idx, rect in enumerate(market_line_rects):
+                    if rect.collidepoint(mx, my):
+                        selected_good = idx
+                        break
+                for action, idx, good, rect in market_buttons:
+                    if rect.collidepoint(mx, my):
+                        price = market_station["prices"][good]
+                        if action == "buy":
+                            if player.credits >= price["buy"] and player.cargo_total() < player.max_cargo:
+                                player.credits -= price["buy"]
+                                player.cargo[good] += 1
+                                trade_message = f"Bought 1 {good} for {price['buy']}cr"
+                            else:
+                                trade_message = "Not enough credits or cargo space"
+                        elif action == "sell":
+                            if player.cargo[good] > 0:
+                                player.credits += price["sell"]
+                                player.cargo[good] -= 1
+                                trade_message = f"Sold 1 {good} for {price['sell']}cr"
+                            else:
+                                trade_message = "No cargo to sell"
+                        selected_good = idx
+                        break
+                if fuel_button and fuel_button.collidepoint(mx, my):
+                    if player.credits >= market_station["fuel_price"] and player.fuel < 100:
+                        player.credits -= market_station["fuel_price"]
+                        player.fuel = min(100, player.fuel + 10)
+                        trade_message = f"Refueled 10% for {market_station['fuel_price']}cr"
+                    else:
+                        trade_message = "Cannot refuel"
+ 
+        player.update()
+ 
+        # 1. VYKRESLENÍ HVĚZD (Parallax efekt)
+        for s in stars:
+            sx = (s[0] - player.x * 0.1) % WIDTH
+            sy = (s[1] - player.y * 0.1) % HEIGHT
+            pygame.draw.circle(screen, WHITE, (int(sx), int(sy)), 1)
+ 
+        # 2. VYKRESLENÍ STANIC (Relativně k hráči)
+        for s in stations:
+            screen_x = s["x"] - player.x + WIDTH // 2
+            screen_y = s["y"] - player.y + HEIGHT // 2
+            if -100 < screen_x < WIDTH + 100 and -100 < screen_y < HEIGHT + 100:
+                center_x = int(screen_x + 15)
+                center_y = int(screen_y + 15)
+                pygame.draw.circle(screen, (70, 70, 140), (center_x, center_y), s["permit_radius"], 1)
+                pygame.draw.circle(screen, (120, 120, 220), (center_x, center_y), s["landing_radius"], 1)
+                pygame.draw.rect(screen, YELLOW, (screen_x, screen_y, 30, 30), 2)
+                pygame.draw.circle(screen, YELLOW, (center_x, center_y), 5)
+                lbl = font.render(f"{s['name']} (Click items and buttons to trade)", True, YELLOW)
+                screen.blit(lbl, (screen_x - 40, screen_y - 25))
+ 
+        p_rad = math.radians(player.angle)
+        p_pts = [
+            (WIDTH//2 + math.cos(p_rad)*18, HEIGHT//2 - math.sin(p_rad)*18),
+            (WIDTH//2 + math.cos(p_rad+2.6)*14, HEIGHT//2 - math.sin(p_rad+2.6)*14),
+            (WIDTH//2 + math.cos(p_rad-2.6)*14, HEIGHT//2 - math.sin(p_rad-2.6)*14)
+        ]
+        pygame.draw.polygon(screen, GREEN, p_pts, 2)
+        if pygame.key.get_pressed()[pygame.K_w] and player.fuel > 0:
+            flame_pts = [
+                (WIDTH//2 + math.cos(p_rad+3.14)*10, HEIGHT//2 - math.sin(p_rad+3.14)*10),
+                (WIDTH//2 + math.cos(p_rad+2.8)*15, HEIGHT//2 - math.sin(p_rad+2.8)*15),
+                (WIDTH//2 + math.cos(p_rad-2.8)*15, HEIGHT//2 - math.sin(p_rad-2.8)*15)
+            ]
+            pygame.draw.polygon(screen, RED, flame_pts)
+ 
+        map_size = 160
+        map_x, map_y = WIDTH - map_size - 20, 20
+        pygame.draw.rect(screen, (30, 30, 30), (map_x, map_y, map_size, map_size))
+        pygame.draw.rect(screen, BLUE, (map_x, map_y, map_size, map_size), 1)
+        pygame.draw.circle(screen, GREEN, (map_x + map_size//2, map_y + map_size//2), 2)
+        for s in stations:
+            rx = (s['x'] - player.x) * 0.01 + map_x + map_size//2
+            ry = (s['y'] - player.y) * 0.01 + map_y + map_size//2
+            if map_x < rx < map_x + map_size and map_y < ry < map_y + map_size:
+                pygame.draw.circle(screen, YELLOW, (int(rx), int(ry)), 2)
+ 
+        if in_permit_zone and not in_landing_zone:
+            speed = math.hypot(player.vel_x, player.vel_y)
+            max_zone_speed = 2.8
+            if speed > max_zone_speed:
+                scale = max_zone_speed / speed
+                player.vel_x *= scale
+                player.vel_y *= scale
+ 
+ 
+        ui_y = 20
+        cargo_text = ", ".join(f"{name} x{count}" for name, count in player.cargo.items() if count) or "Empty"
+        info = [
+            (f"CREDITS: {player.credits}", WHITE),
+            (f"FUEL: {int(player.fuel)}%", RED if player.fuel < 20 else GREEN),
+            (f"CARGO: {cargo_text}", WHITE),
+            (f"POS: {int(player.x)}, {int(player.y)}", BLUE)
+        ]
+        if in_landing_zone:
+            info.append(("ZONE: Docking zone active", GREEN))
+        elif in_permit_zone:
+            info.append(("ZONE: Permit approach zone", (180, 180, 0)))
+        else:
+            info.append(("ZONE: Outside station zones", RED))
+        for text, color in info:
+            screen.blit(font.render(text, True, color), (20, ui_y))
+            ui_y += 25
+ 
+ 
+        if market_station and not docking:
+            panel_w = 600
+            panel_h = 70 + len(GOODS) * 40 + 70
+            pygame.draw.rect(screen, (15, 15, 25), (panel_x, panel_y, panel_w, panel_h))
+            pygame.draw.rect(screen, BLUE, (panel_x, panel_y, panel_w, panel_h), 2)
+            title = font.render(f"{market_station['name']} Market", True, YELLOW)
+            screen.blit(title, (panel_x + 20, panel_y + 10))
+            fuel_text = font.render(f"Fuel refill: 10% for {market_station['fuel_price']}cr", True, WHITE)
+            screen.blit(fuel_text, (panel_x + 20, panel_y + 35))
+ 
+            for idx, good in enumerate(GOODS):
+                price = market_station['prices'][good]
+                y = panel_y + 60 + idx * 40
+                item_bg = (40, 40, 60) if idx == selected_good else (30, 30, 45)
+                pygame.draw.rect(screen, item_bg, (panel_x + 20, y, 560, 32))
+                pygame.draw.rect(screen, WHITE, (panel_x + 20, y, 560, 32), 1)
+                line = f"{idx+1}. {good}: BUY {price['buy']}   SELL {price['sell']}"
+                screen.blit(font.render(line, True, GREEN if idx == selected_good else WHITE), (panel_x + 30, y + 6))
+ 
+                buy_rect = pygame.Rect(panel_x + 380, y + 4, 90, 24)
+                sell_rect = pygame.Rect(panel_x + 490, y + 4, 90, 24)
+                pygame.draw.rect(screen, GREEN, buy_rect)
+                pygame.draw.rect(screen, RED, sell_rect)
+                screen.blit(font.render("BUY", True, BLACK), (buy_rect.x + 28, buy_rect.y + 4))
+                screen.blit(font.render("SELL", True, BLACK), (sell_rect.x + 24, sell_rect.y + 4))
+ 
+            fuel_button = pygame.Rect(panel_x + 380, panel_y + 60 + len(GOODS) * 40, 200, 30)
+            pygame.draw.rect(screen, BLUE, fuel_button)
+            screen.blit(font.render("REFUEL", True, WHITE), (fuel_button.x + 64, fuel_button.y + 4))
+ 
+            if trade_message:
+                screen.blit(font.render(trade_message, True, BLUE), (panel_x + 20, panel_y + panel_h - 30))
+ 
+        screen.blit(font.render("W-S: Thrust/Brake | A-D: Turn | Click buttons in market panel to trade", True, WHITE), (20, HEIGHT - 35))
+ 
+        pygame.display.flip()
+        clock.tick(FPS)
+ 
+while True:
+    selected_resolution = show_menu(selected_resolution)
+    create_screen(RESOLUTION_OPTIONS[selected_resolution][0])
+    stars = [(random.randint(0, WIDTH), random.randint(0, HEIGHT)) for _ in range(150)]
+    run_game()
+ 
+pygame.quit()
