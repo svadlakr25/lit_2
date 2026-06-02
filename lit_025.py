@@ -2,6 +2,8 @@ import pygame
 import math
 import random
 import sys
+import json
+import os
  
 # --- KONFIGURACE ---
 WIDTH, HEIGHT = 1100, 700
@@ -11,8 +13,14 @@ FPS = 60
 stars = []
 
 # Velikosti zón okolo stanic
+# Barvy
+# ... (rest of file unchanged)
+# Save file
 STATION_PERMIT_RADIUS = 220    # Vnější zóna (omezuje rychlost)
 STATION_LANDING_RADIUS = 60    # Vnitřní zóna (hned otevírá obchod)
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+SAVE_FILE = os.path.join(SCRIPT_DIR, "savegame.json")
+load_on_start = False
  
 # Barvy
 BLACK = (0, 0, 0)
@@ -86,27 +94,118 @@ class Player:
  
     def cargo_total(self):
         return sum(self.cargo.values())
+
+    def to_dict(self):
+        return {
+            "x": self.x,
+            "y": self.y,
+            "angle": self.angle,
+            "vel_x": self.vel_x,
+            "vel_y": self.vel_y,
+            "fuel": self.fuel,
+            "credits": self.credits,
+            "cargo": self.cargo,
+            "max_cargo": self.max_cargo
+        }
+
+    @classmethod
+    def from_dict(cls, data):
+        p = cls()
+        p.x = data.get("x", 0)
+        p.y = data.get("y", 0)
+        p.angle = data.get("angle", 90)
+        p.vel_x = data.get("vel_x", 0)
+        p.vel_y = data.get("vel_y", 0)
+        p.fuel = data.get("fuel", 100.0)
+        p.credits = data.get("credits", 0)
+        p.cargo = data.get("cargo", {item: 0 for item in GOODS})
+        p.max_cargo = data.get("max_cargo", 20)
+        return p
  
 # --- GENEROVÁNÍ VESMÍRU ---
 player = Player()
  
-# Náhodné stanice v obrovském prostoru
+# Náhodné stanice v obrovském prostoru s rovnoměrným rozmístěním
 stations = []
-names = ["Alpha", "Bravo", "Gamma", "Delta", "Echo", "Omega"]
-for name in names:
-    prices = {}
-    for good in GOODS:
-        base = BASE_PRICES[good]
-        buy_price = max(5, base + random.randint(-15, 20))
-        sell_price = max(1, buy_price - random.randint(10, 25))
-        prices[good] = {"buy": buy_price, "sell": sell_price}
-    stations.append({
-        "name": f"Station {name}",
-        "x": random.randint(-5000, 5000),
-        "y": random.randint(-5000, 5000),
-        "prices": prices,
-        "fuel_price": 8
-    })
+station_names = [
+    "Alpha", "Bravo", "Gamma", "Delta", "Echo", "Omega",
+    "Nova", "Sierra", "Vega", "Orion", "Atlas", "Titan",
+    "Helix", "Cosmo", "Luna", "Pulsar", "Aurora", "Zenith"
+]
+station_range = 12000
+min_station_distance = 1400
+for name in station_names:
+    placed = False
+    for _ in range(40):
+        x = random.randint(-station_range, station_range)
+        y = random.randint(-station_range, station_range)
+        if all(math.hypot(x - s["x"], y - s["y"]) >= min_station_distance for s in stations):
+            prices = {}
+            for good in GOODS:
+                base = BASE_PRICES[good]
+                buy_price = max(5, base + random.randint(-15, 20))
+                sell_price = max(1, buy_price - random.randint(10, 25))
+                prices[good] = {"buy": buy_price, "sell": sell_price}
+            stations.append({
+                "name": f"Station {name}",
+                "x": x,
+                "y": y,
+                "prices": prices,
+                "fuel_price": 8
+            })
+            placed = True
+            break
+    if not placed:
+        prices = {}
+        for good in GOODS:
+            base = BASE_PRICES[good]
+            buy_price = max(5, base + random.randint(-15, 20))
+            sell_price = max(1, buy_price - random.randint(10, 25))
+            prices[good] = {"buy": buy_price, "sell": sell_price}
+        stations.append({
+            "name": f"Station {name}",
+            "x": random.randint(-station_range, station_range),
+            "y": random.randint(-station_range, station_range),
+            "prices": prices,
+            "fuel_price": 8
+        })
+
+
+def save_game(player_obj, stations_obj):
+    try:
+        data = {
+            "player": player_obj.to_dict(),
+            "stations": stations_obj
+        }
+        with open(SAVE_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print("Failed to save game:", e)
+
+
+def load_game():
+    if not os.path.exists(SAVE_FILE):
+        return None
+    try:
+        with open(SAVE_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        player_data = data.get("player")
+        stations_data = data.get("stations")
+        if player_data is None or stations_data is None:
+            return None
+        p = Player.from_dict(player_data)
+        return p, stations_data
+    except Exception as e:
+        print("Failed to load save:", e)
+        return None
+
+
+def delete_save():
+    try:
+        if os.path.exists(SAVE_FILE):
+            os.remove(SAVE_FILE)
+    except Exception as e:
+        print("Failed to delete save:", e)
  
 def create_screen(resolution):
     global WIDTH, HEIGHT, screen
@@ -123,38 +222,85 @@ def draw_centered(text, y, color=WHITE):
     img = font.render(text, True, color)
     screen.blit(img, ((WIDTH - img.get_width()) // 2, y))
  
+def draw_ship_icon(surface, x, y, scale=1.0, angle=0.0, color=GREEN):
+    rad = math.radians(angle)
+    nose = (x + math.cos(rad) * 38 * scale, y - math.sin(rad) * 38 * scale)
+    left_wing = (x + math.cos(rad + 2.4) * 22 * scale, y - math.sin(rad + 2.4) * 22 * scale)
+    right_wing = (x + math.cos(rad - 2.4) * 22 * scale, y - math.sin(rad - 2.4) * 22 * scale)
+    back_left = (x + math.cos(rad + 3.4) * 18 * scale, y - math.sin(rad + 3.4) * 18 * scale)
+    back_right = (x + math.cos(rad - 3.4) * 18 * scale, y - math.sin(rad - 3.4) * 18 * scale)
+    body = [nose, left_wing, back_left, back_right, right_wing]
+    pygame.draw.polygon(surface, color, body)
+    thruster = [
+        (x + math.cos(rad + math.pi) * 12 * scale, y - math.sin(rad + math.pi) * 12 * scale),
+        (x + math.cos(rad + 2.8) * 18 * scale, y - math.sin(rad + 2.8) * 18 * scale),
+        (x + math.cos(rad - 2.8) * 18 * scale, y - math.sin(rad - 2.8) * 18 * scale)
+    ]
+    pygame.draw.polygon(surface, RED, thruster)
+    pygame.draw.circle(surface, (230, 230, 255), (int(x + math.cos(rad) * 6 * scale), int(y - math.sin(rad) * 6 * scale)), int(4 * scale))
+ 
 selected_resolution = 2  # Nastaveno na index 2 (1100x700) jako bezpečný střed
 resolution_options = RESOLUTION_OPTIONS
  
 def show_menu(selected_resolution):
     menu_mode = "main"
     menu_index = 0
+    menu_stars = [[random.randint(0, WIDTH), random.randint(0, HEIGHT), random.uniform(0.2, 0.8)] for _ in range(90)]
     while True:
         screen.fill(BLACK)
         menu_buttons = []
+        current_time = pygame.time.get_ticks()
+        ship_angle = (current_time * 0.02) % 360
  
+        # Background grid and stars
+        for x in range(0, WIDTH, 120):
+            pygame.draw.line(screen, (10, 10, 20), (x, 0), (x, HEIGHT))
+        for y in range(0, HEIGHT, 120):
+            pygame.draw.line(screen, (10, 10, 20), (0, y), (WIDTH, y))
+ 
+        for star in menu_stars:
+            star[0] += star[2]
+            if star[0] > WIDTH:
+                star[0] = 0
+                star[1] = random.randint(0, HEIGHT)
+            pygame.draw.circle(screen, (180, 220, 255), (int(star[0]), int(star[1])), 2)
+ 
+        glow = int(10 + 6 * math.sin(current_time * 0.004))
+        pygame.draw.circle(screen, (20, 40, 80), (WIDTH // 2, 170), 170, 1)
+        pygame.draw.circle(screen, (30, 60, 110), (WIDTH // 2, 170), 140, 1)
+ 
+        draw_ship_icon(screen, WIDTH // 2, 170, scale=1.5, angle=ship_angle, color=(120, 220, 255))
+        draw_centered("ELITE PYTHON", 64, YELLOW)
+        draw_centered("Pilot your ship through space and dock at stations", 100, WHITE)
+ 
+        save_exists = os.path.exists(SAVE_FILE)
         if menu_mode == "main":
-            draw_centered("Elite Python: WSAD Edition", 120, YELLOW)
-            draw_centered("Start and choose settings before play", 160, WHITE)
-            for idx, label in enumerate(["Start Game", "Settings", "Quit"]):
-                rect = pygame.Rect((WIDTH // 2 - 150, 240 + idx * 70, 300, 50))
+            if save_exists:
+                button_labels = ["Continue", "New Game", "Settings", "Quit"]
+            else:
+                button_labels = ["Start Game", "Settings", "Quit"]
+            for idx, label in enumerate(button_labels):
+                rect = pygame.Rect((WIDTH // 2 - 175, 260 + idx * 80, 350, 60))
                 menu_buttons.append(("main", idx, rect))
-                color = GREEN if idx == menu_index else BLUE
-                pygame.draw.rect(screen, color, rect)
-                screen.blit(font.render(label, True, BLACK), (rect.x + 80, rect.y + 14))
+                color = (55, 140, 210) if idx != menu_index else (100, 220, 170)
+                pygame.draw.rect(screen, color, rect, border_radius=18)
+                pygame.draw.rect(screen, (220, 220, 220), rect, 2, border_radius=18)
+                screen.blit(font.render(label, True, BLACK), (rect.x + 120, rect.y + 18))
         else:
-            draw_centered("Settings", 120, YELLOW)
-            draw_centered("Choose resolution or fullscreen", 160, WHITE)
+            draw_centered("Settings", 140, YELLOW)
+            draw_centered("Choose resolution", 168, WHITE)
             for idx, (_, label) in enumerate(resolution_options):
-                rect = pygame.Rect((WIDTH // 2 - 220, 240 + idx * 60, 440, 45))
+                rect = pygame.Rect((WIDTH // 2 - 210, 240 + idx * 70, 420, 55))
                 menu_buttons.append(("resolution", idx, rect))
-                color = GREEN if idx == selected_resolution else BLUE
-                pygame.draw.rect(screen, color, rect)
-                screen.blit(font.render(label, True, BLACK), (rect.x + 20, rect.y + 12))
-            back_rect = pygame.Rect((WIDTH // 2 - 90, 240 + len(resolution_options) * 60, 180, 45))
+                color = (55, 140, 210) if idx != selected_resolution else (100, 220, 170)
+                pygame.draw.rect(screen, color, rect, border_radius=16)
+                pygame.draw.rect(screen, (220, 220, 220), rect, 2, border_radius=16)
+                screen.blit(font.render(label, True, BLACK), (rect.x + 20, rect.y + 16))
+            back_rect = pygame.Rect((WIDTH // 2 - 90, 240 + len(resolution_options) * 70, 180, 55))
             menu_buttons.append(("back", None, back_rect))
-            pygame.draw.rect(screen, RED, back_rect)
-            screen.blit(font.render("Back", True, BLACK), (back_rect.x + 65, back_rect.y + 12))
+            pygame.draw.rect(screen, RED, back_rect, border_radius=16)
+            pygame.draw.rect(screen, (220, 220, 220), back_rect, 2, border_radius=16)
+            screen.blit(font.render("Back", True, BLACK), (back_rect.x + 60, back_rect.y + 16))
  
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -169,33 +315,53 @@ def show_menu(selected_resolution):
                         pygame.quit()
                         sys.exit()
                 elif event.key == pygame.K_DOWN:
-                    menu_index = min(menu_index + 1, 2 if menu_mode == "main" else len(resolution_options))
+                    max_index = len(menu_buttons) - 1
+                    menu_index = min(menu_index + 1, max_index)
                 elif event.key == pygame.K_UP:
                     menu_index = max(menu_index - 1, 0)
                 elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
-                    if menu_mode == "main":
-                        if menu_index == 0:
+                    kind, idx, _ = menu_buttons[menu_index]
+                    if kind == "main":
+                        label = button_labels[idx]
+                        if label == "Continue":
+                            global load_on_start
+                            load_on_start = True
                             return selected_resolution
-                        elif menu_index == 1:
+                        elif label == "New Game":
+                            delete_save()
+                            load_on_start = False
+                            return selected_resolution
+                        elif label == "Start Game":
+                            load_on_start = False
+                            return selected_resolution
+                        elif label == "Settings":
                             menu_mode = "settings"
                             menu_index = selected_resolution
                         else:
                             pygame.quit()
                             sys.exit()
-                    else:
-                        if menu_index < len(resolution_options):
-                            selected_resolution = menu_index
-                        else:
-                            menu_mode = "main"
-                            menu_index = 0
+                    elif kind == "resolution":
+                        selected_resolution = idx
+                    elif kind == "back":
+                        menu_mode = "main"
+                        menu_index = 0
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 mx, my = event.pos
                 for kind, idx, rect in menu_buttons:
                     if rect.collidepoint(mx, my):
                         if kind == "main":
-                            if idx == 0:
+                            label = button_labels[idx]
+                            if label == "Continue":
+                                load_on_start = True
                                 return selected_resolution
-                            elif idx == 1:
+                            elif label == "New Game":
+                                delete_save()
+                                load_on_start = False
+                                return selected_resolution
+                            elif label == "Start Game":
+                                load_on_start = False
+                                return selected_resolution
+                            elif label == "Settings":
                                 menu_mode = "settings"
                                 menu_index = selected_resolution
                             else:
@@ -259,9 +425,11 @@ def run_game():
  
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
+                save_game(player, stations)
                 pygame.quit()
                 sys.exit()
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                save_game(player, stations)
                 return
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and market_station:
                 trade_message = ""
@@ -433,6 +601,20 @@ def run_game():
 while True:
     selected_resolution = show_menu(selected_resolution)
     create_screen(RESOLUTION_OPTIONS[selected_resolution][0])
+    # If user chose Continue, load the save
+    if load_on_start:
+        loaded = load_game()
+        if loaded:
+            p_loaded, stations_loaded = loaded
+            player.x = p_loaded.x
+            player.y = p_loaded.y
+            player.angle = p_loaded.angle
+            player.vel_x = p_loaded.vel_x
+            player.vel_y = p_loaded.vel_y
+            player.fuel = p_loaded.fuel
+            player.credits = p_loaded.credits
+            player.cargo = p_loaded.cargo
+            stations = stations_loaded
     # Generování hvězd až PO nastavení rozlišení obrazovky
     stars = [(random.randint(0, WIDTH), random.randint(0, HEIGHT)) for _ in range(150)]
     run_game()

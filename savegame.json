@@ -1,0 +1,525 @@
+{
+  "player": {
+    "x": 1901.3977246571603,
+    "y": -2620.6117042369024,
+    "angle": -302,
+    "vel_x": 0.7178349320340567,
+    "vel_y": -0.48451669645801837,
+    "fuel": 89.13999999999959,
+    "credits": 500,
+    "cargo": {
+      "Meat": 0,
+      "Table": 0,
+      "Food": 0,
+      "Ore": 0,
+      "Spices": 0
+    },
+    "max_cargo": 20
+  },
+  "stations": [
+    {
+      "name": "Station Alpha",
+      "x": -2337,
+      "y": 4757,
+      "prices": {
+        "Meat": {
+          "buy": 25,
+          "sell": 14
+        },
+        "Table": {
+          "buy": 74,
+          "sell": 60
+        },
+        "Food": {
+          "buy": 38,
+          "sell": 15
+        },
+        "Ore": {
+          "buy": 60,
+          "sell": 46
+        },
+        "Spices": {
+          "buy": 82,
+          "sell": 67
+        }
+      },
+      "fuel_price": 8
+    },
+    {
+      "name": "Station Bravo",
+      "x": -6696,
+      "y": -10232,
+      "prices": {
+        "Meat": {
+          "buy": 36,
+          "sell": 26
+        },
+        "Table": {
+          "buy": 82,
+          "sell": 71
+        },
+        "Food": {
+          "buy": 24,
+          "sell": 3
+        },
+        "Ore": {
+          "buy": 68,
+          "sell": 53
+        },
+        "Spices": {
+          "buy": 61,
+          "sell": 43
+        }
+      },
+      "fuel_price": 8
+    },
+    {
+      "name": "Station Gamma",
+      "x": 7270,
+      "y": 6973,
+      "prices": {
+        "Meat": {
+          "buy": 36,
+          "sell": 22
+        },
+        "Table": {
+          "buy": 68,
+          "sell": 50
+        },
+        "Food": {
+          "buy": 27,
+          "sell": 3
+        },
+        "Ore": {
+          "buy": 63,
+          "sell": 53
+        },
+        "Spices": {
+          "buy": 89,
+          "sell": 73
+        }
+      },
+      "fuel_price": 8
+    },
+    {
+      "name": "Station Delta",
+      "x": 2849,
+      "y": -3868,
+      "prices": {
+        "Meat": {
+          "buy": 58,
+          "sell": 41
+        },
+        "Table": {
+          "buy": 83,
+          "sell": 62
+        },
+        "Food": {
+          "buy": 33,
+          "sell": 10
+        },
+        "Ore": {
+          "buy": 69,
+          "sell": 48
+        },
+        "Spices": {
+          "buy": 63,
+          "sell": 49
+        }
+      },
+      "fuel_price": 8
+    },
+    {
+      "name": "Station Echo",
+      "x": 11350,
+      "y": -8751,
+      "prices": {
+        "Meat": {
+          "buy": 43,
+          "sell": 29
+        },
+        "Table": {
+          "buy": 56,
+          "sell": 44
+        },
+        "Food": {
+          "buy": 55,
+          "sell": 45
+        },
+        "Ore": {
+          "buy": 43,
+          "sell": 33
+        },
+        "Spices": {
+          "buy": 69,
+          "sell": 52
+        }
+      },
+      "fuel_price": 8
+    },
+    {
+      "name": "Station Omega",
+      "x": 9287,
+      "y": 11697,
+      "prices": {
+        "Meat": {
+          "buy": 55,
+          "sell": 45
+        },
+        "Table": {
+          "buy": 80,
+          "sell": 67
+        },
+        "Food": {
+          "buy": 21,
+          "sell": 5
+        },
+        "Ore": {
+          "buy": 71,
+          "sell": 50
+        },
+        "Spices": {
+          "buy": 94,
+          "sell": 84
+        }
+      },
+      "fuel_price": 8
+    },
+    {
+      "name": "Station Nova",
+      "x": 11478,
+      "y": 3661,
+      "prices": {
+        "Meat": {
+          "buy": 45,
+          "sell": 24
+        },
+        "Table": {
+          "buy": 65,
+          "sell": 48
+        },
+        "Food": {
+          "buy": 33,
+          "sell": 9
+        },
+        "Ore": {
+          "buy": 58,
+          "sell": 43
+        },
+        "Spices": {
+          "buy": 77,
+          "sell": 61
+        }
+      },
+      "fuel_price": 8
+    },
+    {
+      "name": "Station Sierra",
+      "x": -4510,
+      "y": -4521,
+      "prices": {
+        "Meat": {
+          "buy": 28,
+          "sell": 15
+        },
+        "Table": {
+          "buy": 59,
+          "sell": 42
+        },
+        "Food": {
+          "buy": 47,
+          "sell": 36
+        },
+        "Ore": {
+          "buy": 74,
+          "sell": 54
+        },
+        "Spices": {
+          "buy": 76,
+          "sell": 61
+        }
+      },
+      "fuel_price": 8
+    },
+    {
+      "name": "Station Vega",
+      "x": 5783,
+      "y": -2231,
+      "prices": {
+        "Meat": {
+          "buy": 57,
+          "sell": 39
+        },
+        "Table": {
+          "buy": 74,
+          "sell": 56
+        },
+        "Food": {
+          "buy": 38,
+          "sell": 24
+        },
+        "Ore": {
+          "buy": 41,
+          "sell": 17
+        },
+        "Spices": {
+          "buy": 93,
+          "sell": 79
+        }
+      },
+      "fuel_price": 8
+    },
+    {
+      "name": "Station Orion",
+      "x": -2182,
+      "y": 2187,
+      "prices": {
+        "Meat": {
+          "buy": 42,
+          "sell": 18
+        },
+        "Table": {
+          "buy": 77,
+          "sell": 60
+        },
+        "Food": {
+          "buy": 33,
+          "sell": 12
+        },
+        "Ore": {
+          "buy": 40,
+          "sell": 25
+        },
+        "Spices": {
+          "buy": 88,
+          "sell": 75
+        }
+      },
+      "fuel_price": 8
+    },
+    {
+      "name": "Station Atlas",
+      "x": -6692,
+      "y": -8304,
+      "prices": {
+        "Meat": {
+          "buy": 60,
+          "sell": 37
+        },
+        "Table": {
+          "buy": 70,
+          "sell": 57
+        },
+        "Food": {
+          "buy": 51,
+          "sell": 32
+        },
+        "Ore": {
+          "buy": 42,
+          "sell": 27
+        },
+        "Spices": {
+          "buy": 83,
+          "sell": 64
+        }
+      },
+      "fuel_price": 8
+    },
+    {
+      "name": "Station Titan",
+      "x": 2195,
+      "y": 7027,
+      "prices": {
+        "Meat": {
+          "buy": 32,
+          "sell": 15
+        },
+        "Table": {
+          "buy": 67,
+          "sell": 52
+        },
+        "Food": {
+          "buy": 26,
+          "sell": 10
+        },
+        "Ore": {
+          "buy": 46,
+          "sell": 22
+        },
+        "Spices": {
+          "buy": 90,
+          "sell": 74
+        }
+      },
+      "fuel_price": 8
+    },
+    {
+      "name": "Station Helix",
+      "x": 9340,
+      "y": -9998,
+      "prices": {
+        "Meat": {
+          "buy": 26,
+          "sell": 3
+        },
+        "Table": {
+          "buy": 55,
+          "sell": 37
+        },
+        "Food": {
+          "buy": 27,
+          "sell": 5
+        },
+        "Ore": {
+          "buy": 49,
+          "sell": 30
+        },
+        "Spices": {
+          "buy": 92,
+          "sell": 82
+        }
+      },
+      "fuel_price": 8
+    },
+    {
+      "name": "Station Cosmo",
+      "x": -9275,
+      "y": -8079,
+      "prices": {
+        "Meat": {
+          "buy": 38,
+          "sell": 26
+        },
+        "Table": {
+          "buy": 67,
+          "sell": 50
+        },
+        "Food": {
+          "buy": 36,
+          "sell": 13
+        },
+        "Ore": {
+          "buy": 43,
+          "sell": 20
+        },
+        "Spices": {
+          "buy": 81,
+          "sell": 66
+        }
+      },
+      "fuel_price": 8
+    },
+    {
+      "name": "Station Luna",
+      "x": -10588,
+      "y": 2370,
+      "prices": {
+        "Meat": {
+          "buy": 40,
+          "sell": 17
+        },
+        "Table": {
+          "buy": 80,
+          "sell": 55
+        },
+        "Food": {
+          "buy": 28,
+          "sell": 7
+        },
+        "Ore": {
+          "buy": 41,
+          "sell": 31
+        },
+        "Spices": {
+          "buy": 72,
+          "sell": 53
+        }
+      },
+      "fuel_price": 8
+    },
+    {
+      "name": "Station Pulsar",
+      "x": 6005,
+      "y": -7157,
+      "prices": {
+        "Meat": {
+          "buy": 38,
+          "sell": 15
+        },
+        "Table": {
+          "buy": 90,
+          "sell": 76
+        },
+        "Food": {
+          "buy": 46,
+          "sell": 24
+        },
+        "Ore": {
+          "buy": 40,
+          "sell": 25
+        },
+        "Spices": {
+          "buy": 71,
+          "sell": 54
+        }
+      },
+      "fuel_price": 8
+    },
+    {
+      "name": "Station Aurora",
+      "x": -5518,
+      "y": 1122,
+      "prices": {
+        "Meat": {
+          "buy": 34,
+          "sell": 10
+        },
+        "Table": {
+          "buy": 82,
+          "sell": 63
+        },
+        "Food": {
+          "buy": 53,
+          "sell": 32
+        },
+        "Ore": {
+          "buy": 74,
+          "sell": 55
+        },
+        "Spices": {
+          "buy": 75,
+          "sell": 54
+        }
+      },
+      "fuel_price": 8
+    },
+    {
+      "name": "Station Zenith",
+      "x": 7292,
+      "y": 9414,
+      "prices": {
+        "Meat": {
+          "buy": 59,
+          "sell": 35
+        },
+        "Table": {
+          "buy": 72,
+          "sell": 50
+        },
+        "Food": {
+          "buy": 53,
+          "sell": 41
+        },
+        "Ore": {
+          "buy": 60,
+          "sell": 43
+        },
+        "Spices": {
+          "buy": 95,
+          "sell": 81
+        }
+      },
+      "fuel_price": 8
+    }
+  ]
+}
